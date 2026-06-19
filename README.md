@@ -17,6 +17,10 @@ firebase deploy --only firestore
 
 Rules hanya memberikan akses kepada Firebase user dengan custom claim admin yang juga masih aktif di koleksi `whitelist_entries`.
 
+### Error `auth/configuration-not-found`
+
+Buka Firebase Console untuk project yang sama, pilih **Authentication**, lalu klik **Get started**. Custom-token login tidak memerlukan provider email atau Google, tetapi layanan Authentication tetap harus diinisialisasi. Tambahkan domain deployment dashboard di **Authentication > Settings > Authorized domains**.
+
 ## Development
 
 ```powershell

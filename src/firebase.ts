@@ -145,7 +145,25 @@ function requireUser(): User {
 
 
 export async function signInAdmin(customToken: string): Promise<void> {
-  await signInWithCustomToken(auth, customToken);
+  try {
+    await signInWithCustomToken(auth, customToken);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "auth/configuration-not-found") {
+      throw new Error(
+        "Firebase Authentication belum diaktifkan. Buka Firebase Console > Authentication lalu klik Get started."
+      );
+    }
+    if (code === "auth/unauthorized-domain") {
+      throw new Error(
+        "Domain dashboard belum diizinkan di Firebase Authentication > Settings > Authorized domains."
+      );
+    }
+    if (code === "auth/invalid-custom-token" || code === "auth/custom-token-mismatch") {
+      throw new Error("Token login tidak cocok dengan Firebase project dashboard.");
+    }
+    throw error;
+  }
 }
 
 

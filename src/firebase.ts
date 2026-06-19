@@ -9,6 +9,7 @@ import {
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -144,9 +145,28 @@ function requireUser(): User {
 }
 
 
-export async function signInAdmin(customToken: string): Promise<void> {
+export async function signInAdmin(loginCode: string): Promise<void> {
   try {
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(loginCode),
+    );
+    const codeHash = [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    const loginReference = doc(db, "admin_login_codes", codeHash);
+    const snapshot = await getDoc(loginReference);
+    if (!snapshot.exists()) {
+      throw new Error("Kode login tidak valid atau kedaluwarsa");
+    }
+    const login = snapshot.data();
+    const expiresAt = dateFromValue(login.expires_at);
+    const customToken = typeof login.custom_token === "string" ? login.custom_token : "";
+    if (!customToken || expiresAt.getTime() <= Date.now()) {
+      throw new Error("Kode login tidak valid atau kedaluwarsa");
+    }
     await signInWithCustomToken(auth, customToken);
+    await deleteDoc(loginReference);
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (code === "auth/configuration-not-found") {
@@ -161,6 +181,9 @@ export async function signInAdmin(customToken: string): Promise<void> {
     }
     if (code === "auth/invalid-custom-token" || code === "auth/custom-token-mismatch") {
       throw new Error("Token login tidak cocok dengan Firebase project dashboard.");
+    }
+    if (code === "permission-denied" || code === "firestore/permission-denied") {
+      throw new Error("Kode login tidak valid, kedaluwarsa, atau Firestore Rules belum dideploy.");
     }
     throw error;
   }

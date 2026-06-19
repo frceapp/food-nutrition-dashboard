@@ -30,6 +30,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Pemegang kode acak dapat membaca tepat satu dokumen yang belum kedaluwarsa.
+    // Listing dilarang; setelah login, hanya admin pemilik token yang boleh menghapus.
+    match /admin_login_codes/{codeHash} {
+      allow get: if resource.data.expires_at > request.time;
+      allow list, create, update: if false;
+      allow delete: if isActiveAdmin()
+        && resource.data.phone_number == adminPhone();
+    }
+
     match /whitelist_entries/{phoneNumber} {
       allow read: if isActiveAdmin();
 

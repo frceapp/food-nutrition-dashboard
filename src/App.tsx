@@ -78,10 +78,11 @@ function LoginPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("token");
-    if (!token) return;
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (!code) return;
+    window.history.replaceState({}, "", "/login");
     setState("loading");
-    signInAdmin(token)
+    signInAdmin(code)
       .then(() => {
         window.history.replaceState({}, "", "/");
         window.location.assign("/");

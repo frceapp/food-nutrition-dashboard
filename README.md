@@ -47,3 +47,9 @@ npm run build
 Firebase Web App config bersifat publik. Kontrol akses data tetap dilakukan oleh Firebase Authentication dan [`firestore.rules`](firestore.rules).
 
 Jangan menyalin `OPENROUTER_API_KEY` atau file service-account ke repository/dashboard server. Keduanya hanya diperlukan oleh bot.
+
+## Login dengan kode pendek
+
+Tautan WhatsApp hanya membawa kode acak pendek, bukan Firebase JWT. Bot menyimpan token sementara pada dokumen Firestore dengan document ID berupa hash SHA-256 kode. Dashboard mengambil dokumen tersebut langsung dari Firestore, login ke Firebase, lalu menghapusnya. Dashboard tidak menghubungi backend bot dan tidak memerlukan `AUTH_API_URL`.
+
+Deploy [`firestore.rules`](firestore.rules) setelah perubahan ini. Rules mengizinkan pembacaan satu dokumen login yang diketahui kodenya dan belum kedaluwarsa, melarang listing koleksi, serta hanya mengizinkan admin terkait menghapus dokumen setelah login.

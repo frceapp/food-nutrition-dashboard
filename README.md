@@ -53,3 +53,13 @@ Jangan menyalin `OPENROUTER_API_KEY` atau file service-account ke repository/das
 Tautan WhatsApp hanya membawa kode acak pendek, bukan Firebase JWT. Bot menyimpan token sementara pada dokumen Firestore dengan document ID berupa hash SHA-256 kode. Dashboard mengambil dokumen tersebut langsung dari Firestore, login ke Firebase, lalu menghapusnya. Dashboard tidak menghubungi backend bot dan tidak memerlukan `AUTH_API_URL`.
 
 Deploy [`firestore.rules`](firestore.rules) setelah perubahan ini. Rules mengizinkan pembacaan satu dokumen login yang diketahui kodenya dan belum kedaluwarsa, melarang listing koleksi, serta hanya mengizinkan admin terkait menghapus dokumen setelah login.
+
+## Pengaturan dan statistik penggunaan
+
+Menu **Pengaturan** menyimpan maintenance manual/terjadwal, jeda dan kuota gambar, serta batas revisi ke `app_settings/runtime`. Menu **Penggunaan** membaca telemetry `usage_events` untuk menampilkan request WhatsApp, gambar, revisi, token OpenRouter, estimasi biaya, pengguna aktif, dan tren 7/30 hari.
+
+Rules terbaru wajib dideploy sebelum kedua menu tersebut digunakan:
+
+```powershell
+firebase deploy --only firestore:rules
+```

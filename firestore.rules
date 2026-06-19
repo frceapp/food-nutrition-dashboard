@@ -30,6 +30,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /usage_events/{eventId} {
+      allow read: if isActiveAdmin();
+      allow write: if false;
+    }
+
+    match /app_settings/{documentId} {
+      allow read: if isActiveAdmin();
+      allow create, update: if isActiveAdmin() && documentId == "runtime";
+      allow delete: if false;
+    }
+
     // Pemegang kode acak dapat membaca tepat satu dokumen yang belum kedaluwarsa.
     // Listing dilarang; setelah login, hanya admin pemilik token yang boleh menghapus.
     match /admin_login_codes/{codeHash} {

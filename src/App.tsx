@@ -7,7 +7,11 @@ import {
   CheckCircle2,
   ChevronDown,
   CircleUserRound,
+  Clock3,
+  Coins,
   Flame,
+  Gauge,
+  ImageIcon,
   LayoutDashboard,
   ListChecks,
   LoaderCircle,
@@ -15,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings2,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -42,11 +47,13 @@ import type { User as FirebaseUser } from "firebase/auth";
 import type {
   DashboardData,
   Period,
+  RuntimeSettings,
+  UsageAnalytics,
   UserOption,
   WhitelistEntry,
 } from "./types";
 
-type View = "overview" | "whitelist";
+type View = "overview" | "usage" | "whitelist" | "settings";
 
 const nutrientMeta = [
   { key: "carbohydrate_g", label: "Karbohidrat", unit: "g", color: "#e9a23b", icon: Wheat },
@@ -374,6 +381,108 @@ function WhitelistPanel() {
   );
 }
 
+function UsagePanel() {
+  const [days, setDays] = useState(7);
+  const [data, setData] = useState<UsageAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLoading(true); setError("");
+    dataService.usageAnalytics(days)
+      .then(setData)
+      .catch((reason) => { setData(null); setError((reason as Error).message); })
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  if (loading) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat statistik penggunaan…</div>;
+  if (error) return <EmptyState title="Statistik tidak dapat dimuat" body={`${error}. Pastikan Firestore Rules terbaru sudah dideploy.`} />;
+  if (!data) return <EmptyState title="Data belum tersedia" body="Belum ada telemetry penggunaan yang tercatat." />;
+
+  const cards = [
+    { label: "Request WhatsApp", value: fmt(data.totals.requests), icon: BarChart3 },
+    { label: "Gambar diproses", value: fmt(data.totals.images), icon: ImageIcon },
+    { label: "Total revisi", value: fmt(data.totals.revisions), icon: RefreshCw },
+    { label: "Token AI", value: fmt(data.totals.total_tokens), icon: Coins },
+    { label: "Pengguna aktif", value: fmt(data.totals.active_users), icon: Users },
+    { label: "Success rate", value: `${fmt(data.totals.success_rate, 1)}%`, icon: CheckCircle2 },
+  ];
+
+  return (
+    <div className="usage-page">
+      <section className="welcome-row">
+        <div><p className="eyebrow">USAGE ANALYTICS</p><h2>Aktivitas bot dan penggunaan AI</h2><p>Request, gambar, revisi, serta konsumsi token OpenRouter.</p></div>
+        <div className="period-toggle"><button className={days === 7 ? "active" : ""} onClick={() => setDays(7)}>7 hari</button><button className={days === 30 ? "active" : ""} onClick={() => setDays(30)}>30 hari</button></div>
+      </section>
+      <section className="usage-stats-grid">
+        {cards.map(({ label, value, icon: Icon }) => <article className="stat-card usage-stat" key={label}><div className="stat-icon soft"><Icon size={19} /></div><div className="stat-main"><span>{label}</span><strong>{value}</strong></div></article>)}
+      </section>
+      <section className="charts-grid usage-charts">
+        <article className="panel chart-panel">
+          <div className="panel-head"><div><p className="eyebrow">TREN HARIAN</p><h3>Request dan gambar</h3></div></div>
+          <ResponsiveContainer width="100%" height={260}><LineChart data={data.daily_series}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatDate} /><YAxis allowDecimals={false} /><Tooltip /><Line type="monotone" dataKey="requests" name="Request" stroke="#2d7560" strokeWidth={3} /><Line type="monotone" dataKey="images" name="Gambar" stroke="#e59a51" strokeWidth={3} /></LineChart></ResponsiveContainer>
+        </article>
+        <article className="panel chart-panel">
+          <div className="panel-head"><div><p className="eyebrow">TOKEN AI</p><h3>Konsumsi token per hari</h3></div><span className="chart-unit">Total {fmt(data.totals.total_tokens)}</span></div>
+          <ResponsiveContainer width="100%" height={260}><BarChart data={data.daily_series}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tickFormatter={formatDate} /><YAxis /><Tooltip /><Bar dataKey="total_tokens" name="Token" fill="#4d8f72" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer>
+        </article>
+      </section>
+      <section className="panel usage-table-panel">
+        <div className="panel-head"><div><p className="eyebrow">PENGGUNA TERATAS</p><h3>Aktivitas per nomor WhatsApp</h3></div><span className="count-badge">Estimasi biaya ${data.totals.cost_usd.toFixed(5)}</span></div>
+        <div className="access-table-wrap"><table className="access-table"><thead><tr><th>Nomor</th><th>Request</th><th>Gambar</th><th>Token</th></tr></thead><tbody>{data.top_users.map((user) => <tr key={user.phone_number}><td data-label="Nomor"><strong>{user.phone_number}</strong></td><td data-label="Request">{fmt(user.requests)}</td><td data-label="Gambar">{fmt(user.images)}</td><td data-label="Token">{fmt(user.tokens)}</td></tr>)}</tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function SettingsPanel() {
+  const [settings, setSettings] = useState<RuntimeSettings | null>(null);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    dataService.runtimeSettings()
+      .then(setSettings)
+      .catch((reason) => setLoadError((reason as Error).message));
+  }, []);
+  if (loadError) return <EmptyState title="Pengaturan tidak dapat dimuat" body={`${loadError}. Pastikan Firestore Rules terbaru sudah dideploy.`} />;
+  if (!settings) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat pengaturan…</div>;
+
+  const save = async (next = settings) => {
+    setSaving(true); setMessage("");
+    try { await dataService.saveRuntimeSettings(next); setSettings(next); setMessage("Pengaturan tersimpan."); }
+    catch (error) { setMessage((error as Error).message); }
+    finally { setSaving(false); }
+  };
+  const toggleMaintenance = () => save({ ...settings, maintenance_manual: !settings.maintenance_manual });
+
+  return (
+    <div className="settings-page">
+      <section className="welcome-row"><div><p className="eyebrow">BOT CONTROL</p><h2>Pengaturan operasional</h2><p>Maintenance, batas kirim gambar, dan revisi makanan.</p></div><span className={`maintenance-badge ${settings.maintenance_manual ? "active" : ""}`}>{settings.maintenance_manual ? "Maintenance aktif" : "Bot aktif"}</span></section>
+      <section className="panel maintenance-panel">
+        <div className="setting-section-head"><div className="setting-icon"><Clock3 /></div><div><h3>Maintenance</h3><p>Mode maintenance memblokir semua request yang akan memakai AI.</p></div><button className={`maintenance-button ${settings.maintenance_manual ? "stop" : ""}`} disabled={saving} onClick={toggleMaintenance}>{settings.maintenance_manual ? "Matikan maintenance" : "Aktifkan sekarang"}</button></div>
+        <div className="settings-grid">
+          <label className="toggle-field"><input type="checkbox" checked={settings.maintenance_schedule_enabled} onChange={(e) => setSettings({ ...settings, maintenance_schedule_enabled: e.target.checked })} /><span>Jadwal rutin aktif</span></label>
+          <label><span>Mulai</span><input type="time" value={settings.maintenance_start} onChange={(e) => setSettings({ ...settings, maintenance_start: e.target.value })} /></label>
+          <label><span>Selesai</span><input type="time" value={settings.maintenance_end} onChange={(e) => setSettings({ ...settings, maintenance_end: e.target.value })} /></label>
+          <label className="wide-field"><span>Pesan maintenance</span><input value={settings.maintenance_message} onChange={(e) => setSettings({ ...settings, maintenance_message: e.target.value })} /></label>
+        </div>
+      </section>
+      <section className="panel limits-panel">
+        <div className="setting-section-head"><div className="setting-icon"><Gauge /></div><div><h3>Limit pengguna</h3><p>Atur jeda, kuota gambar dalam satu window, dan batas revisi per analisis.</p></div></div>
+        <div className="settings-grid limits-grid">
+          <label><span>Jeda antar gambar (detik)</span><input type="number" min="0" max="3600" value={settings.image_cooldown_seconds} onChange={(e) => setSettings({ ...settings, image_cooldown_seconds: Number(e.target.value) })} /></label>
+          <label><span>Durasi window (menit)</span><input type="number" min="1" max="1440" value={settings.image_window_minutes} onChange={(e) => setSettings({ ...settings, image_window_minutes: Number(e.target.value) })} /></label>
+          <label><span>Maksimal gambar / window</span><input type="number" min="1" max="1000" value={settings.max_images_per_window} onChange={(e) => setSettings({ ...settings, max_images_per_window: Number(e.target.value) })} /></label>
+          <label><span>Maksimal revisi / analisis</span><input type="number" min="0" max="50" value={settings.max_revisions_per_analysis} onChange={(e) => setSettings({ ...settings, max_revisions_per_analysis: Number(e.target.value) })} /></label>
+        </div>
+      </section>
+      <div className="settings-actions"><span>{message}</span><button className="primary-button" disabled={saving} onClick={() => save()}>{saving ? <LoaderCircle className="spin" size={18} /> : <CheckCircle2 size={18} />} Simpan pengaturan</button></div>
+    </div>
+  );
+}
+
 function DashboardApp() {
   const [view, setView] = useState<View>("overview");
   const [period, setPeriod] = useState<Period>("daily");
@@ -408,7 +517,9 @@ function DashboardApp() {
         <div className="sidebar-brand"><div className="brand-mark small"><Apple size={22} /></div><div><strong>NUTRIA</strong><span>Nutrition intelligence</span></div></div>
         <nav>
           <button className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={() => setView("overview")}><LayoutDashboard size={19} /> Ringkasan</button>
+          <button className={view === "usage" ? "active" : ""} aria-current={view === "usage" ? "page" : undefined} onClick={() => setView("usage")}><BarChart3 size={19} /> Penggunaan</button>
           <button className={view === "whitelist" ? "active" : ""} aria-current={view === "whitelist" ? "page" : undefined} onClick={() => setView("whitelist")}><ListChecks size={19} /> Akses</button>
+          <button className={view === "settings" ? "active" : ""} aria-current={view === "settings" ? "page" : undefined} onClick={() => setView("settings")}><Settings2 size={19} /> Pengaturan</button>
         </nav>
         <div className="sidebar-footer">
           <div className="admin-chip"><div>{adminLabel.slice(0, 1).toUpperCase()}</div><span><strong>{adminLabel}</strong><small>Administrator</small></span></div>
@@ -426,10 +537,13 @@ function DashboardApp() {
               <div className="period-toggle"><button className={period === "daily" ? "active" : ""} onClick={() => setPeriod("daily")}>Hari ini</button><button className={period === "weekly" ? "active" : ""} onClick={() => setPeriod("weekly")}>7 hari</button></div>
               <button className="icon-button refresh-button" onClick={() => selectedPhone && dataService.dashboard(selectedPhone, period).then(setData)} title="Muat ulang" aria-label="Muat ulang data"><RefreshCw size={18} /></button>
             </div>
-          ) : <div className="topbar-title"><ShieldCheck size={18} /> Admin access</div>}
+          ) : <div className="topbar-title"><ShieldCheck size={18} /> Admin dashboard</div>}
         </header>
         <div className="content-area">
-          {view === "overview" ? <Overview data={data} loading={loading} /> : <WhitelistPanel />}
+          {view === "overview" && <Overview data={data} loading={loading} />}
+          {view === "usage" && <UsagePanel />}
+          {view === "whitelist" && <WhitelistPanel />}
+          {view === "settings" && <SettingsPanel />}
         </div>
       </main>
     </div>

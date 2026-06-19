@@ -63,3 +63,38 @@ export interface WhitelistEntry {
   created_at: string;
   updated_at: string;
 }
+
+export interface RuntimeSettings {
+  maintenance_manual: boolean;
+  maintenance_schedule_enabled: boolean;
+  maintenance_start: string;
+  maintenance_end: string;
+  maintenance_message: string;
+  image_cooldown_seconds: number;
+  image_window_minutes: number;
+  max_images_per_window: number;
+  max_revisions_per_analysis: number;
+}
+
+export interface UsageAnalytics {
+  totals: {
+    requests: number;
+    images: number;
+    revisions: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    cost_usd: number;
+    active_users: number;
+    success_rate: number;
+  };
+  daily_series: Array<{
+    date: string;
+    requests: number;
+    images: number;
+    revisions: number;
+    total_tokens: number;
+  }>;
+  request_types: Array<{ name: string; value: number }>;
+  top_users: Array<{ phone_number: string; requests: number; images: number; tokens: number }>;
+}

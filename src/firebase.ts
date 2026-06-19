@@ -18,6 +18,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -27,6 +28,8 @@ import type {
   FoodItem,
   NutritionValues,
   Period,
+  RuntimeSettings,
+  UsageAnalytics,
   UserOption,
   WhitelistEntry,
 } from "./types";
@@ -369,5 +372,106 @@ export const dataService = {
       is_admin: false,
       updated_at: serverTimestamp(),
     });
+  },
+
+  async runtimeSettings(): Promise<RuntimeSettings> {
+    requireUser();
+    const snapshot = await getDoc(doc(db, "app_settings", "runtime"));
+    const data = snapshot.data() || {};
+    return {
+      maintenance_manual: Boolean(data.maintenance_manual),
+      maintenance_schedule_enabled: Boolean(data.maintenance_schedule_enabled),
+      maintenance_start: typeof data.maintenance_start === "string" ? data.maintenance_start : "23:00",
+      maintenance_end: typeof data.maintenance_end === "string" ? data.maintenance_end : "01:00",
+      maintenance_message: typeof data.maintenance_message === "string"
+        ? data.maintenance_message
+        : "NUTRIA sedang dalam pemeliharaan. Silakan coba kembali setelah maintenance selesai.",
+      image_cooldown_seconds: typeof data.image_cooldown_seconds === "number"
+        ? data.image_cooldown_seconds
+        : 30,
+      image_window_minutes: typeof data.image_window_minutes === "number"
+        ? data.image_window_minutes
+        : 60,
+      max_images_per_window: typeof data.max_images_per_window === "number"
+        ? data.max_images_per_window
+        : 10,
+      max_revisions_per_analysis: typeof data.max_revisions_per_analysis === "number"
+        ? data.max_revisions_per_analysis
+        : 3,
+    };
+  },
+
+  async saveRuntimeSettings(settings: RuntimeSettings): Promise<void> {
+    const admin = await this.me();
+    await setDoc(doc(db, "app_settings", "runtime"), {
+      ...settings,
+      updated_at: serverTimestamp(),
+      updated_by_phone: admin.phone_number,
+    }, { merge: true });
+  },
+
+  async usageAnalytics(days = 7): Promise<UsageAnalytics> {
+    requireUser();
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - days);
+    const snapshot = await getDocs(query(
+      collection(db, "usage_events"),
+      where("created_at", ">=", Timestamp.fromDate(start)),
+      orderBy("created_at", "desc"),
+    ));
+    const totals = {
+      requests: 0,
+      images: 0,
+      revisions: 0,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+      active_users: 0,
+      success_rate: 0,
+    };
+    const users = new Set<string>();
+    const daily = new Map<string, UsageAnalytics["daily_series"][number]>();
+    const requestTypes = new Map<string, number>();
+    const userStats = new Map<string, { phone_number: string; requests: number; images: number; tokens: number }>();
+    let successes = 0;
+    for (const item of snapshot.docs) {
+      const event = item.data();
+      const phone = String(event.user_id || "unknown");
+      const type = String(event.request_type || "chat");
+      const date = localDateKey(dateFromValue(event.created_at));
+      const images = numberValue(event.image_count);
+      const tokens = numberValue(event.total_tokens);
+      totals.requests += 1;
+      totals.images += images;
+      totals.revisions += type === "revision" ? 1 : 0;
+      totals.prompt_tokens += numberValue(event.prompt_tokens);
+      totals.completion_tokens += numberValue(event.completion_tokens);
+      totals.total_tokens += tokens;
+      totals.cost_usd += numberValue(event.cost_usd);
+      if (event.status === "success") successes += 1;
+      users.add(phone);
+      requestTypes.set(type, (requestTypes.get(type) || 0) + 1);
+      const day = daily.get(date) || { date, requests: 0, images: 0, revisions: 0, total_tokens: 0 };
+      day.requests += 1;
+      day.images += images;
+      day.revisions += type === "revision" ? 1 : 0;
+      day.total_tokens += tokens;
+      daily.set(date, day);
+      const user = userStats.get(phone) || { phone_number: phone, requests: 0, images: 0, tokens: 0 };
+      user.requests += 1;
+      user.images += images;
+      user.tokens += tokens;
+      userStats.set(phone, user);
+    }
+    totals.active_users = users.size;
+    totals.success_rate = totals.requests ? Math.round(successes / totals.requests * 1000) / 10 : 0;
+    totals.cost_usd = Math.round(totals.cost_usd * 1_000_000) / 1_000_000;
+    return {
+      totals,
+      daily_series: [...daily.values()].sort((left, right) => left.date.localeCompare(right.date)),
+      request_types: [...requestTypes].map(([name, value]) => ({ name, value })),
+      top_users: [...userStats.values()].sort((left, right) => right.requests - left.requests).slice(0, 8),
+    };
   },
 };

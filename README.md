@@ -15,7 +15,7 @@ firebase use YOUR_FIREBASE_PROJECT_ID
 firebase deploy --only firestore
 ```
 
-Rules hanya memberikan akses kepada Firebase user dengan custom claim admin yang juga masih aktif di koleksi `whitelist_entries`.
+Rules memberikan admin aktif akses pengelolaan penuh dashboard. Pengguna whitelist biasa hanya dapat membaca profil dan log makanan miliknya sendiri.
 
 ### Error `auth/configuration-not-found`
 
@@ -50,7 +50,7 @@ Jangan menyalin `OPENROUTER_API_KEY` atau file service-account ke repository/das
 
 ## Login dengan kode pendek
 
-Tautan WhatsApp hanya membawa kode acak pendek, bukan Firebase JWT. Bot menyimpan token sementara pada dokumen Firestore dengan document ID berupa hash SHA-256 kode. Dashboard mengambil dokumen tersebut langsung dari Firestore, login ke Firebase, lalu menghapusnya. Dashboard tidak menghubungi backend bot dan tidak memerlukan `AUTH_API_URL`.
+Pengguna whitelist mengirim `login` atau `dashboard` ke bot WhatsApp. Tautan yang diterima hanya membawa kode acak pendek, bukan Firebase JWT. Bot menyimpan token sementara pada dokumen Firestore dengan document ID berupa hash SHA-256 kode. Dashboard mengambil dokumen tersebut langsung dari Firestore, login ke Firebase, lalu menghapusnya. Dashboard tidak menghubungi backend bot dan tidak memerlukan `AUTH_API_URL`.
 
 Deploy [`firestore.rules`](firestore.rules) setelah perubahan ini. Rules mengizinkan pembacaan satu dokumen login yang diketahui kodenya dan belum kedaluwarsa, melarang listing koleksi, serta hanya mengizinkan admin terkait menghapus dokumen setelah login.
 

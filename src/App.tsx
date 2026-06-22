@@ -50,6 +50,7 @@ import type {
   RuntimeSettings,
   UsageAnalytics,
   UserOption,
+  Viewer,
   WhitelistEntry,
 } from "./types";
 
@@ -106,10 +107,10 @@ function LoginPage() {
       <div className="login-orb login-orb-two" />
       <section className="login-card">
         <div className="brand-mark"><Apple size={30} /></div>
-        <p className="eyebrow">NUTRIA ADMIN</p>
+        <p className="eyebrow">NUTRIA DASHBOARD</p>
         <h1>Pahami pola makan.<br />Ambil keputusan lebih baik.</h1>
         <p className="login-copy">
-          Dashboard privat untuk memantau asupan nutrisi, progres harian, dan akses pengguna.
+          Dashboard pribadi untuk memantau asupan nutrisi dan progres harian.
         </p>
         <div className={`login-status ${state}`}>
           {state === "loading" ? (
@@ -117,7 +118,7 @@ function LoginPage() {
           ) : state === "error" ? (
             <><span>!</span> {message || "Tautan tidak valid atau kedaluwarsa."}</>
           ) : (
-            <><ShieldCheck size={20} /> Buka tautan masuk yang diterima melalui WhatsApp admin.</>
+            <><ShieldCheck size={20} /> Buka tautan masuk yang diterima melalui WhatsApp.</>
           )}
         </div>
         <p className="login-footnote">Gunakan tautan segera dan jangan membagikannya kepada orang lain.</p>
@@ -484,25 +485,29 @@ function SettingsPanel() {
   );
 }
 
-function DashboardApp() {
+function DashboardApp({ viewer }: { viewer: Viewer }) {
   const [view, setView] = useState<View>("overview");
   const [period, setPeriod] = useState<Period>("daily");
   const [users, setUsers] = useState<UserOption[]>([]);
   const [selectedPhone, setSelectedPhone] = useState("");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [adminLabel, setAdminLabel] = useState("Admin");
+  const [viewerLabel, setViewerLabel] = useState(viewer.label || viewer.phone_number);
 
   useEffect(() => {
+    if (!viewer.is_admin) {
+      setSelectedPhone(viewer.phone_number);
+      return;
+    }
     Promise.all([dataService.me(), dataService.users()])
       .then(([admin, userList]) => {
-        setAdminLabel(admin.label || admin.phone_number);
+        setViewerLabel(admin.label || admin.phone_number);
         setUsers(userList);
         const preferred = userList.find((user) => !user.is_admin && user.profile_complete) || userList[0];
         if (preferred) setSelectedPhone(preferred.phone_number);
       })
       .catch(() => undefined);
-  }, []);
+  }, [viewer]);
 
   useEffect(() => {
     if (!selectedPhone || view !== "overview") return;
@@ -514,16 +519,16 @@ function DashboardApp() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className={`sidebar ${viewer.is_admin ? "" : "user-sidebar"}`}>
         <div className="sidebar-brand"><div className="brand-mark small"><Apple size={22} /></div><div><strong>NUTRIA</strong><span>Nutrition intelligence</span></div></div>
         <nav>
           <button className={view === "overview" ? "active" : ""} aria-current={view === "overview" ? "page" : undefined} onClick={() => setView("overview")}><LayoutDashboard size={19} /> Ringkasan</button>
-          <button className={view === "usage" ? "active" : ""} aria-current={view === "usage" ? "page" : undefined} onClick={() => setView("usage")}><BarChart3 size={19} /> Penggunaan</button>
-          <button className={view === "whitelist" ? "active" : ""} aria-current={view === "whitelist" ? "page" : undefined} onClick={() => setView("whitelist")}><ListChecks size={19} /> Akses</button>
-          <button className={view === "settings" ? "active" : ""} aria-current={view === "settings" ? "page" : undefined} onClick={() => setView("settings")}><Settings2 size={19} /> Pengaturan</button>
+          {viewer.is_admin && <button className={view === "usage" ? "active" : ""} aria-current={view === "usage" ? "page" : undefined} onClick={() => setView("usage")}><BarChart3 size={19} /> Penggunaan</button>}
+          {viewer.is_admin && <button className={view === "whitelist" ? "active" : ""} aria-current={view === "whitelist" ? "page" : undefined} onClick={() => setView("whitelist")}><ListChecks size={19} /> Akses</button>}
+          {viewer.is_admin && <button className={view === "settings" ? "active" : ""} aria-current={view === "settings" ? "page" : undefined} onClick={() => setView("settings")}><Settings2 size={19} /> Pengaturan</button>}
         </nav>
         <div className="sidebar-footer">
-          <div className="admin-chip"><div>{adminLabel.slice(0, 1).toUpperCase()}</div><span><strong>{adminLabel}</strong><small>Administrator</small></span></div>
+          <div className="admin-chip"><div>{viewerLabel.slice(0, 1).toUpperCase()}</div><span><strong>{viewerLabel}</strong><small>{viewer.is_admin ? "Administrator" : "Pengguna"}</small></span></div>
           <button className="logout-button" onClick={logout} title="Keluar"><LogOut size={18} /></button>
         </div>
       </aside>
@@ -534,7 +539,7 @@ function DashboardApp() {
           <button className="mobile-logout" onClick={logout} title="Keluar" aria-label="Keluar dari dashboard"><LogOut size={18} /><span>Keluar</span></button>
           {view === "overview" ? (
             <div className="topbar-controls">
-              <label className="user-select"><Users size={17} /><select aria-label="Pilih pengguna" value={selectedPhone} onChange={(e) => setSelectedPhone(e.target.value)}><option value="">Pilih pengguna</option>{users.map((user) => <option key={user.phone_number} value={user.phone_number}>{user.label || user.phone_number}</option>)}</select><ChevronDown size={15} /></label>
+              {viewer.is_admin ? <label className="user-select"><Users size={17} /><select aria-label="Pilih pengguna" value={selectedPhone} onChange={(e) => setSelectedPhone(e.target.value)}><option value="">Pilih pengguna</option>{users.map((user) => <option key={user.phone_number} value={user.phone_number}>{user.label || user.phone_number}</option>)}</select><ChevronDown size={15} /></label> : <div className="profile-pill"><CircleUserRound size={17} /><strong>{viewerLabel}</strong></div>}
               <div className="period-toggle"><button className={period === "daily" ? "active" : ""} onClick={() => setPeriod("daily")}>Hari ini</button><button className={period === "weekly" ? "active" : ""} onClick={() => setPeriod("weekly")}>7 hari</button></div>
               <button className="icon-button refresh-button" onClick={() => selectedPhone && dataService.dashboard(selectedPhone, period).then(setData)} title="Muat ulang" aria-label="Muat ulang data"><RefreshCw size={18} /></button>
             </div>
@@ -553,15 +558,24 @@ function DashboardApp() {
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => observeAdminAuth((nextUser) => {
     setUser(nextUser);
-    setAuthReady(true);
+    if (!nextUser) {
+      setViewer(null);
+      setAuthReady(true);
+      return;
+    }
+    setAuthReady(false);
+    dataService.viewer()
+      .then(setViewer)
+      .finally(() => setAuthReady(true));
   }), []);
 
   if (window.location.pathname === "/login") return <LoginPage />;
-  if (!authReady) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat sesi adminâ€¦</div>;
-  if (!user) return <LoginPage />;
-  return <DashboardApp />;
+  if (!authReady) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat sesi dashboard...</div>;
+  if (!user || !viewer) return <LoginPage />;
+  return <DashboardApp viewer={viewer} />;
 }

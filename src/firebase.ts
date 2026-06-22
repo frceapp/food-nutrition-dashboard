@@ -31,6 +31,7 @@ import type {
   RuntimeSettings,
   UsageAnalytics,
   UserOption,
+  Viewer,
   WhitelistEntry,
 } from "./types";
 
@@ -143,7 +144,7 @@ function progressStatus(percent: number): string {
 
 
 function requireUser(): User {
-  if (!auth.currentUser) throw new Error("Login admin diperlukan");
+  if (!auth.currentUser) throw new Error("Login dashboard diperlukan");
   return auth.currentUser;
 }
 
@@ -204,6 +205,19 @@ export async function logoutAdmin(): Promise<void> {
 
 
 export const dataService = {
+  async viewer(): Promise<Viewer> {
+    const user = requireUser();
+    const token = await user.getIdTokenResult();
+    const phoneNumber = String(token.claims.phone_number || "");
+    if (!phoneNumber) throw new Error("Identitas pengguna tidak tersedia");
+    return {
+      id: user.uid,
+      phone_number: phoneNumber,
+      label: typeof token.claims.label === "string" ? token.claims.label : null,
+      is_admin: token.claims.admin === true,
+    };
+  },
+
   async me(): Promise<{ id: string; phone_number: string; label: string | null }> {
     const user = requireUser();
     const token = await user.getIdTokenResult();

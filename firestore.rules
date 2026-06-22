@@ -2,31 +2,38 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function adminPhone() {
+    function viewerPhone() {
       return request.auth.token.phone_number;
     }
 
-    function isActiveAdmin() {
+    function isActiveUser() {
       return request.auth != null
-        && request.auth.token.admin == true
         && request.auth.token.phone_number is string
-        && exists(/databases/$(database)/documents/whitelist_entries/$(adminPhone()))
-        && get(/databases/$(database)/documents/whitelist_entries/$(adminPhone())).data.is_admin == true
-        && get(/databases/$(database)/documents/whitelist_entries/$(adminPhone())).data.is_enabled == true;
+        && exists(/databases/$(database)/documents/whitelist_entries/$(viewerPhone()))
+        && get(/databases/$(database)/documents/whitelist_entries/$(viewerPhone())).data.is_enabled == true;
+    }
+
+    function isActiveAdmin() {
+      return isActiveUser()
+        && request.auth.token.admin == true
+        && get(/databases/$(database)/documents/whitelist_entries/$(viewerPhone())).data.is_admin == true;
     }
 
     match /users/{phoneNumber} {
-      allow read: if isActiveAdmin();
+      allow read: if isActiveAdmin()
+        || (isActiveUser() && phoneNumber == viewerPhone());
       allow write: if false;
     }
 
     match /user_profiles/{phoneNumber} {
-      allow read: if isActiveAdmin();
+      allow read: if isActiveAdmin()
+        || (isActiveUser() && phoneNumber == viewerPhone());
       allow write: if false;
     }
 
     match /food_analysis_logs/{logId} {
-      allow read: if isActiveAdmin();
+      allow read: if isActiveAdmin()
+        || (isActiveUser() && resource.data.user_id == viewerPhone());
       allow write: if false;
     }
 
@@ -42,20 +49,21 @@ service cloud.firestore {
     }
 
     // Pemegang kode acak dapat membaca tepat satu dokumen yang belum kedaluwarsa.
-    // Listing dilarang; setelah login, hanya admin pemilik token yang boleh menghapus.
+    // Listing dilarang; setelah login, hanya pemilik token yang boleh menghapus.
     match /admin_login_codes/{codeHash} {
       allow get: if resource.data.expires_at > request.time;
       allow list, create, update: if false;
-      allow delete: if isActiveAdmin()
-        && resource.data.phone_number == adminPhone();
+      allow delete: if isActiveUser()
+        && resource.data.phone_number == viewerPhone();
     }
 
     match /whitelist_entries/{phoneNumber} {
-      allow read: if isActiveAdmin();
+      allow read: if isActiveAdmin()
+        || (isActiveUser() && phoneNumber == viewerPhone());
 
       allow create: if isActiveAdmin()
         && request.resource.data.phone_number == phoneNumber
-        && request.resource.data.created_by_phone == adminPhone()
+        && request.resource.data.created_by_phone == viewerPhone()
         && request.resource.data.is_enabled == true;
 
       allow update: if isActiveAdmin()
@@ -63,7 +71,7 @@ service cloud.firestore {
         && request.resource.data.created_by_phone == resource.data.created_by_phone
         && request.resource.data.created_at == resource.data.created_at
         && (
-          phoneNumber != adminPhone()
+          phoneNumber != viewerPhone()
           || (request.resource.data.is_admin == true && request.resource.data.is_enabled == true)
         );
 

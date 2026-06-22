@@ -1,5 +1,12 @@
 export type Period = "daily" | "weekly";
 
+export interface Viewer {
+  id: string;
+  phone_number: string;
+  label: string | null;
+  is_admin: boolean;
+}
+
 export interface UserOption {
   phone_number: string;
   label: string | null;

@@ -56,7 +56,7 @@ Deploy [`firestore.rules`](firestore.rules) setelah perubahan ini. Rules mengizi
 
 ## Pengaturan dan statistik penggunaan
 
-Menu **Pengaturan** menyimpan maintenance manual/terjadwal, jeda dan kuota gambar, serta batas revisi ke `app_settings/runtime`. Menu **Penggunaan** membaca telemetry `usage_events` untuk menampilkan request WhatsApp, gambar, revisi, token OpenRouter, estimasi biaya, pengguna aktif, dan tren 7/30 hari.
+Menu **Pengaturan** menyimpan maintenance manual/terjadwal, jeda dan kuota gambar, batas revisi, serta timeout konfirmasi otomatis ke `app_settings/runtime`. Menu **Penggunaan** membaca telemetry `usage_events` untuk menampilkan request WhatsApp, gambar, revisi, token OpenRouter, estimasi biaya, pengguna aktif, dan tren 7/30 hari.
 
 Rules terbaru wajib dideploy sebelum kedua menu tersebut digunakan:
 

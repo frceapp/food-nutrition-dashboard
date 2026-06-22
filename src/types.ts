@@ -74,6 +74,7 @@ export interface RuntimeSettings {
   image_window_minutes: number;
   max_images_per_window: number;
   max_revisions_per_analysis: number;
+  confirmation_timeout_minutes: number;
 }
 
 export interface UsageAnalytics {

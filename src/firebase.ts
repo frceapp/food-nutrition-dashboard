@@ -398,6 +398,9 @@ export const dataService = {
       max_revisions_per_analysis: typeof data.max_revisions_per_analysis === "number"
         ? data.max_revisions_per_analysis
         : 3,
+      confirmation_timeout_minutes: typeof data.confirmation_timeout_minutes === "number"
+        ? data.confirmation_timeout_minutes
+        : 1,
     };
   },
 

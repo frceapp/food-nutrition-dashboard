@@ -470,12 +470,13 @@ function SettingsPanel() {
         </div>
       </section>
       <section className="panel limits-panel">
-        <div className="setting-section-head"><div className="setting-icon"><Gauge /></div><div><h3>Limit pengguna</h3><p>Atur jeda, kuota gambar dalam satu window, dan batas revisi per analisis.</p></div></div>
+        <div className="setting-section-head"><div className="setting-icon"><Gauge /></div><div><h3>Limit pengguna</h3><p>Atur jeda, kuota gambar, batas revisi, dan waktu konfirmasi otomatis.</p></div></div>
         <div className="settings-grid limits-grid">
           <label><span>Jeda antar gambar (detik)</span><input type="number" min="0" max="3600" value={settings.image_cooldown_seconds} onChange={(e) => setSettings({ ...settings, image_cooldown_seconds: Number(e.target.value) })} /></label>
           <label><span>Durasi window (menit)</span><input type="number" min="1" max="1440" value={settings.image_window_minutes} onChange={(e) => setSettings({ ...settings, image_window_minutes: Number(e.target.value) })} /></label>
           <label><span>Maksimal gambar / window</span><input type="number" min="1" max="1000" value={settings.max_images_per_window} onChange={(e) => setSettings({ ...settings, max_images_per_window: Number(e.target.value) })} /></label>
           <label><span>Maksimal revisi / analisis</span><input type="number" min="0" max="50" value={settings.max_revisions_per_analysis} onChange={(e) => setSettings({ ...settings, max_revisions_per_analysis: Number(e.target.value) })} /></label>
+          <label><span>Konfirmasi otomatis (menit)</span><input type="number" min="1" max="1440" value={settings.confirmation_timeout_minutes} onChange={(e) => setSettings({ ...settings, confirmation_timeout_minutes: Number(e.target.value) })} /></label>
         </div>
       </section>
       <div className="settings-actions"><span>{message}</span><button className="primary-button" disabled={saving} onClick={() => save()}>{saving ? <LoaderCircle className="spin" size={18} /> : <CheckCircle2 size={18} />} Simpan pengaturan</button></div>

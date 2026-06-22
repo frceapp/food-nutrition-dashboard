@@ -17,6 +17,7 @@ import {
   LoaderCircle,
   LogOut,
   Plus,
+  Pencil,
   RefreshCw,
   Search,
   Settings2,
@@ -25,6 +26,7 @@ import {
   Trash2,
   Users,
   Wheat,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -145,13 +147,19 @@ function ProfileEditor({ data, onSave }: { data: DashboardData; onSave: (payload
   const [activity, setActivity] = useState<ProfileUpdate["activity_level"]>("ringan");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [editing, setEditing] = useState(false);
 
-  useEffect(() => {
+  const resetFields = () => {
     setName(data.profile?.name || "");
     setWeight(data.profile?.weight_kg || 60);
     setHeight(data.profile?.height_cm || 160);
     setActivity((data.profile?.activity_level as ProfileUpdate["activity_level"]) || "ringan");
+  };
+
+  useEffect(() => {
+    resetFields();
     setMessage("");
+    setEditing(false);
   }, [data.phone_number, data.profile]);
 
   const submit = async (event: React.FormEvent) => {
@@ -160,6 +168,7 @@ function ProfileEditor({ data, onSave }: { data: DashboardData; onSave: (payload
     try {
       await onSave({ name, weight_kg: weight, height_cm: height, activity_level: activity });
       setMessage("Profil, IMT, dan target kalori sudah diperbarui.");
+      setEditing(false);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -167,16 +176,37 @@ function ProfileEditor({ data, onSave }: { data: DashboardData; onSave: (payload
     }
   };
 
+  const cancel = () => {
+    resetFields();
+    setMessage("");
+    setEditing(false);
+  };
+
   return (
     <section className="panel profile-editor-panel">
-      <div className="panel-head"><div><p className="eyebrow">PROFIL & IMT</p><h3>Perbarui data pengguna</h3></div><CircleUserRound size={21} /></div>
-      <form className="profile-edit-grid" onSubmit={submit}>
-        <label><span>Nama</span><input value={name} maxLength={80} required onChange={(event) => setName(event.target.value)} /></label>
-        <label><span>Berat badan (kg)</span><input type="number" min="25" max="300" step="0.1" value={weight} required onChange={(event) => setWeight(Number(event.target.value))} /></label>
-        <label><span>Tinggi badan (cm)</span><input type="number" min="100" max="230" step="0.1" value={height} required onChange={(event) => setHeight(Number(event.target.value))} /></label>
-        <label><span>Aktivitas</span><select value={activity} onChange={(event) => setActivity(event.target.value as ProfileUpdate["activity_level"])}><option value="rendah">Rendah</option><option value="ringan">Ringan</option><option value="sedang">Sedang</option><option value="tinggi">Tinggi</option></select></label>
-        <div className="profile-edit-action"><span>{message}</span><button className="primary-button" disabled={saving} type="submit">{saving ? <LoaderCircle className="spin" size={18} /> : <CheckCircle2 size={18} />} Simpan profil</button></div>
-      </form>
+      <div className="panel-head">
+        <div><p className="eyebrow">PROFIL & IMT</p><h3>{editing ? "Perbarui data pengguna" : "Data profil"}</h3></div>
+        {!editing && <button className="profile-edit-toggle" type="button" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={16} /> Edit profil</button>}
+      </div>
+      {editing ? (
+        <form className="profile-edit-grid" onSubmit={submit}>
+          <label><span>Nama</span><input value={name} maxLength={80} required onChange={(event) => setName(event.target.value)} /></label>
+          <label><span>Berat badan (kg)</span><input type="number" min="25" max="300" step="0.1" value={weight} required onChange={(event) => setWeight(Number(event.target.value))} /></label>
+          <label><span>Tinggi badan (cm)</span><input type="number" min="100" max="230" step="0.1" value={height} required onChange={(event) => setHeight(Number(event.target.value))} /></label>
+          <label><span>Aktivitas</span><select value={activity} onChange={(event) => setActivity(event.target.value as ProfileUpdate["activity_level"])}><option value="rendah">Rendah</option><option value="ringan">Ringan</option><option value="sedang">Sedang</option><option value="tinggi">Tinggi</option></select></label>
+          <div className="profile-edit-action"><span>{message}</span><div><button className="secondary-button" disabled={saving} type="button" onClick={cancel}><X size={17} /> Batal</button><button className="primary-button" disabled={saving} type="submit">{saving ? <LoaderCircle className="spin" size={18} /> : <CheckCircle2 size={18} />} Simpan profil</button></div></div>
+        </form>
+      ) : (
+        <>
+          <div className="profile-summary-grid">
+            <div><span>Nama</span><strong>{data.profile?.name || "Belum diisi"}</strong></div>
+            <div><span>IMT</span><strong>{data.profile?.bmi || "—"}</strong><small>{data.profile?.bmi_category || "Belum tersedia"}</small></div>
+            <div><span>Berat / Tinggi</span><strong>{data.profile?.weight_kg ? `${fmt(data.profile.weight_kg, 1)} kg` : "—"} / {data.profile?.height_cm ? `${fmt(data.profile.height_cm, 1)} cm` : "—"}</strong></div>
+            <div><span>Aktivitas</span><strong>{data.profile?.activity_level || "Belum diisi"}</strong></div>
+          </div>
+          {message && <p className="profile-save-message">{message}</p>}
+        </>
+      )}
     </section>
   );
 }

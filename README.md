@@ -15,11 +15,13 @@ firebase use YOUR_FIREBASE_PROJECT_ID
 firebase deploy --only firestore
 ```
 
-Rules memberikan admin aktif akses pengelolaan penuh dashboard. Pengguna whitelist biasa hanya dapat membaca profil dan log makanan miliknya sendiri.
+Rules memberikan admin aktif akses pengelolaan penuh dashboard. Pengguna whitelist biasa hanya dapat membaca data miliknya sendiri dan mengubah nama, berat badan, tinggi badan, serta pola aktivitas pada profilnya sendiri.
 
 Log berstatus `rejected` hanya dapat dibaca admin. Item tersebut diberi penanda **Ditolak pengguna** pada daftar makanan admin dan tidak dimasukkan ke total maupun grafik nutrisi.
 
 Admin dapat menghapus permanen catatan makanan dari daftar. Tombol hapus tidak dirender untuk pengguna biasa dan Firestore Rules hanya mengizinkan operasi tersebut untuk admin aktif.
+
+Form **Profil & IMT** tersedia pada halaman ringkasan. Saat profil disimpan, dashboard menghitung ulang IMT, kategori IMT, dan estimasi target kalori harian. Admin dapat mengubah profil pengguna yang sedang dipilih; pengguna biasa hanya dapat mengubah profilnya sendiri.
 
 ### Error `auth/configuration-not-found`
 

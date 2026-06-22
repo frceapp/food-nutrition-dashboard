@@ -19,16 +19,69 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/whitelist_entries/$(viewerPhone())).data.is_admin == true;
     }
 
+    function canEditProfile(phoneNumber) {
+      return isActiveAdmin()
+        || (isActiveUser() && phoneNumber == viewerPhone());
+    }
+
+    function validProfileData(data, phoneNumber) {
+      return data.user_id == phoneNumber
+        && (data.weight_kg is int || data.weight_kg is float)
+        && data.weight_kg >= 25
+        && data.weight_kg <= 300
+        && (data.height_cm is int || data.height_cm is float)
+        && data.height_cm >= 100
+        && data.height_cm <= 230
+        && data.activity_level in ["rendah", "ringan", "sedang", "tinggi"]
+        && (data.bmi is int || data.bmi is float)
+        && data.bmi >= 4
+        && data.bmi <= 300
+        && data.bmi_category is string
+        && data.daily_calorie_target is int
+        && data.daily_calorie_target >= 625
+        && data.daily_calorie_target <= 12000
+        && data.onboarding_step == "complete";
+    }
+
     match /users/{phoneNumber} {
       allow read: if isActiveAdmin()
         || (isActiveUser() && phoneNumber == viewerPhone());
-      allow write: if false;
+      allow create: if canEditProfile(phoneNumber)
+        && request.resource.data.phone_number == phoneNumber
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 80;
+      allow update: if canEditProfile(phoneNumber)
+        && request.resource.data.phone_number == resource.data.phone_number
+        && request.resource.data.phone_number == phoneNumber
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["name", "updated_at"]);
+      allow delete: if false;
     }
 
     match /user_profiles/{phoneNumber} {
       allow read: if isActiveAdmin()
         || (isActiveUser() && phoneNumber == viewerPhone());
-      allow write: if false;
+      allow create: if canEditProfile(phoneNumber)
+        && validProfileData(request.resource.data, phoneNumber);
+      allow update: if canEditProfile(phoneNumber)
+        && request.resource.data.user_id == resource.data.user_id
+        && validProfileData(request.resource.data, phoneNumber)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "weight_kg",
+          "height_cm",
+          "activity_level",
+          "bmi",
+          "bmi_category",
+          "daily_calorie_target",
+          "onboarding_step",
+          "completed_at",
+          "updated_at"
+        ]);
+      allow delete: if false;
     }
 
     match /food_analysis_logs/{logId} {

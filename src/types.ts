@@ -7,6 +7,13 @@ export interface Viewer {
   is_admin: boolean;
 }
 
+export interface ProfileUpdate {
+  name: string;
+  weight_kg: number;
+  height_cm: number;
+  activity_level: "rendah" | "ringan" | "sedang" | "tinggi";
+}
+
 export interface UserOption {
   phone_number: string;
   label: string | null;

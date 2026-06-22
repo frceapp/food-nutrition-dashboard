@@ -47,6 +47,7 @@ import type { User as FirebaseUser } from "firebase/auth";
 import type {
   DashboardData,
   Period,
+  ProfileUpdate,
   RuntimeSettings,
   UsageAnalytics,
   UserOption,
@@ -137,7 +138,50 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-function Overview({ data, loading, canDelete = false, onDeleteMeal }: { data: DashboardData | null; loading: boolean; canDelete?: boolean; onDeleteMeal?: (id: string) => void }) {
+function ProfileEditor({ data, onSave }: { data: DashboardData; onSave: (payload: ProfileUpdate) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [weight, setWeight] = useState(60);
+  const [height, setHeight] = useState(160);
+  const [activity, setActivity] = useState<ProfileUpdate["activity_level"]>("ringan");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setName(data.profile?.name || "");
+    setWeight(data.profile?.weight_kg || 60);
+    setHeight(data.profile?.height_cm || 160);
+    setActivity((data.profile?.activity_level as ProfileUpdate["activity_level"]) || "ringan");
+    setMessage("");
+  }, [data.phone_number, data.profile]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true); setMessage("");
+    try {
+      await onSave({ name, weight_kg: weight, height_cm: height, activity_level: activity });
+      setMessage("Profil, IMT, dan target kalori sudah diperbarui.");
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="panel profile-editor-panel">
+      <div className="panel-head"><div><p className="eyebrow">PROFIL & IMT</p><h3>Perbarui data pengguna</h3></div><CircleUserRound size={21} /></div>
+      <form className="profile-edit-grid" onSubmit={submit}>
+        <label><span>Nama</span><input value={name} maxLength={80} required onChange={(event) => setName(event.target.value)} /></label>
+        <label><span>Berat badan (kg)</span><input type="number" min="25" max="300" step="0.1" value={weight} required onChange={(event) => setWeight(Number(event.target.value))} /></label>
+        <label><span>Tinggi badan (cm)</span><input type="number" min="100" max="230" step="0.1" value={height} required onChange={(event) => setHeight(Number(event.target.value))} /></label>
+        <label><span>Aktivitas</span><select value={activity} onChange={(event) => setActivity(event.target.value as ProfileUpdate["activity_level"])}><option value="rendah">Rendah</option><option value="ringan">Ringan</option><option value="sedang">Sedang</option><option value="tinggi">Tinggi</option></select></label>
+        <div className="profile-edit-action"><span>{message}</span><button className="primary-button" disabled={saving} type="submit">{saving ? <LoaderCircle className="spin" size={18} /> : <CheckCircle2 size={18} />} Simpan profil</button></div>
+      </form>
+    </section>
+  );
+}
+
+function Overview({ data, loading, canDelete = false, onDeleteMeal, onSaveProfile }: { data: DashboardData | null; loading: boolean; canDelete?: boolean; onDeleteMeal?: (id: string) => void; onSaveProfile: (payload: ProfileUpdate) => Promise<void> }) {
   if (loading) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat data nutrisi…</div>;
   if (!data) return <EmptyState title="Pilih pengguna" body="Pilih nomor WhatsApp untuk melihat data nutrisi." />;
 
@@ -183,6 +227,8 @@ function Overview({ data, loading, canDelete = false, onDeleteMeal }: { data: Da
           </div>
         )}
       </section>
+
+      <ProfileEditor data={data} onSave={onSaveProfile} />
 
       <section className="stats-grid">
         <article className="stat-card calorie-card">
@@ -523,6 +569,12 @@ function DashboardApp({ viewer }: { viewer: Viewer }) {
       setData(await dataService.dashboard(selectedPhone, period, true));
     }
   };
+  const saveProfile = async (payload: ProfileUpdate) => {
+    if (!selectedPhone) throw new Error("Pilih pengguna terlebih dahulu");
+    await dataService.updateProfile(selectedPhone, payload);
+    setData(await dataService.dashboard(selectedPhone, period, viewer.is_admin));
+    if (selectedPhone === viewer.phone_number) setViewerLabel(payload.name.trim());
+  };
 
   return (
     <div className="app-shell">
@@ -553,7 +605,7 @@ function DashboardApp({ viewer }: { viewer: Viewer }) {
           ) : <div className="topbar-title"><ShieldCheck size={18} /> Admin dashboard</div>}
         </header>
         <div className="content-area">
-          {view === "overview" && <Overview data={data} loading={loading} canDelete={viewer.is_admin} onDeleteMeal={deleteMeal} />}
+          {view === "overview" && <Overview data={data} loading={loading} canDelete={viewer.is_admin} onDeleteMeal={deleteMeal} onSaveProfile={saveProfile} />}
           {view === "usage" && <UsagePanel />}
           {view === "whitelist" && <WhitelistPanel />}
           {view === "settings" && <SettingsPanel />}

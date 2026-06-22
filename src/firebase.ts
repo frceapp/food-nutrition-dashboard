@@ -28,6 +28,7 @@ import type {
   FoodItem,
   NutritionValues,
   Period,
+  ProfileUpdate,
   RuntimeSettings,
   UsageAnalytics,
   UserOption,
@@ -140,6 +141,14 @@ function progressStatus(percent: number): string {
   if (percent < 80) return "belum mencapai target";
   if (percent <= 120) return "sesuai rentang target";
   return "di atas target";
+}
+
+
+function bmiCategory(bmi: number): string {
+  if (bmi < 18.5) return "berat badan kurang";
+  if (bmi < 25) return "normal";
+  if (bmi < 30) return "berat badan berlebih";
+  return "obesitas";
 }
 
 
@@ -361,6 +370,49 @@ export const dataService = {
   async deleteMeal(logId: string): Promise<void> {
     await this.me();
     await deleteDoc(doc(db, "food_analysis_logs", logId));
+  },
+
+  async updateProfile(phone: string, payload: ProfileUpdate): Promise<void> {
+    const viewer = await this.viewer();
+    if (!viewer.is_admin && viewer.phone_number !== phone) {
+      throw new Error("Profil pengguna lain tidak dapat diubah");
+    }
+    const name = payload.name.trim();
+    if (!name || name.length > 80) throw new Error("Nama harus berisi 1-80 karakter");
+    if (payload.weight_kg < 25 || payload.weight_kg > 300) throw new Error("Berat harus 25-300 kg");
+    if (payload.height_cm < 100 || payload.height_cm > 230) throw new Error("Tinggi harus 100-230 cm");
+    const multipliers: Record<ProfileUpdate["activity_level"], number> = {
+      rendah: 25,
+      ringan: 30,
+      sedang: 35,
+      tinggi: 40,
+    };
+    const bmi = payload.weight_kg / ((payload.height_cm / 100) ** 2);
+    const userReference = doc(db, "users", phone);
+    const profileReference = doc(db, "user_profiles", phone);
+    await runTransaction(db, async (transaction) => {
+      const userSnapshot = await transaction.get(userReference);
+      const profileSnapshot = await transaction.get(profileReference);
+      transaction.set(userReference, {
+        phone_number: phone,
+        name,
+        ...(userSnapshot.exists() ? {} : { created_at: serverTimestamp() }),
+        updated_at: serverTimestamp(),
+      }, { merge: true });
+      transaction.set(profileReference, {
+        user_id: phone,
+        weight_kg: payload.weight_kg,
+        height_cm: payload.height_cm,
+        activity_level: payload.activity_level,
+        bmi: Math.round(bmi * 10) / 10,
+        bmi_category: bmiCategory(bmi),
+        daily_calorie_target: Math.round(payload.weight_kg * multipliers[payload.activity_level]),
+        onboarding_step: "complete",
+        completed_at: serverTimestamp(),
+        ...(profileSnapshot.exists() ? {} : { created_at: serverTimestamp() }),
+        updated_at: serverTimestamp(),
+      }, { merge: true });
+    });
   },
 
   async whitelist(): Promise<WhitelistEntry[]> {

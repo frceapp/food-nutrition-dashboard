@@ -259,19 +259,28 @@ export const dataService = {
       .sort((left, right) => (left.label || left.phone_number).localeCompare(right.label || right.phone_number));
   },
 
-  async dashboard(phone: string, period: Period): Promise<DashboardData> {
+  async dashboard(phone: string, period: Period, includeRejected = false): Promise<DashboardData> {
     requireUser();
     const queryStart = new Date();
     queryStart.setUTCDate(queryStart.getUTCDate() - 8);
-    const [userSnapshot, profileSnapshot, logsSnapshot] = await Promise.all([
-      getDoc(doc(db, "users", phone)),
-      getDoc(doc(db, "user_profiles", phone)),
-      getDocs(query(
+    const logsQuery = includeRejected
+      ? query(
         collection(db, "food_analysis_logs"),
         where("user_id", "==", phone),
         where("created_at", ">=", Timestamp.fromDate(queryStart)),
         orderBy("created_at", "desc"),
-      )),
+      )
+      : query(
+        collection(db, "food_analysis_logs"),
+        where("user_id", "==", phone),
+        where("status", "==", "success"),
+        where("created_at", ">=", Timestamp.fromDate(queryStart)),
+        orderBy("created_at", "desc"),
+      );
+    const [userSnapshot, profileSnapshot, logsSnapshot] = await Promise.all([
+      getDoc(doc(db, "users", phone)),
+      getDoc(doc(db, "user_profiles", phone)),
+      getDocs(logsQuery),
     ]);
     const userData = userSnapshot.data();
     const profileData = profileSnapshot.data();
@@ -282,27 +291,31 @@ export const dataService = {
 
     for (const snapshot of logsSnapshot.docs) {
       const log = snapshot.data();
-      if (log.status !== "success" || !log.nutrition_json) continue;
+      const rejected = log.status === "rejected";
+      if ((!rejected && log.status !== "success") || !log.nutrition_json) continue;
       const createdAt = dateFromValue(log.created_at);
       const date = localDateKey(createdAt);
       if (!acceptedDates.has(date)) continue;
       const nutrition = log.nutrition_json as Record<string, unknown>;
-      const daily: { date: string } & NutritionValues = series.get(date) || {
-        date,
-        energy_kcal: 0,
-        carbohydrate_g: 0,
-        protein_g: 0,
-        fat_g: 0,
-        fiber_g: 0,
-      };
-      for (const key of NUTRIENT_KEYS) {
-        const value = numberValue(nutrition[key]);
-        totals[key] += value;
-        daily[key] = numberValue(daily[key]) + value;
+      if (!rejected) {
+        const daily: { date: string } & NutritionValues = series.get(date) || {
+          date,
+          energy_kcal: 0,
+          carbohydrate_g: 0,
+          protein_g: 0,
+          fat_g: 0,
+          fiber_g: 0,
+        };
+        for (const key of NUTRIENT_KEYS) {
+          const value = numberValue(nutrition[key]);
+          totals[key] += value;
+          daily[key] = numberValue(daily[key]) + value;
+        }
+        series.set(date, daily);
       }
-      series.set(date, daily);
       meals.push({
         id: snapshot.id,
+        status: rejected ? "rejected" : "success",
         created_at: createdAt.toISOString(),
         date,
         foods: Array.isArray(log.detected_foods_json) ? log.detected_foods_json as FoodItem[] : [],
@@ -343,6 +356,11 @@ export const dataService = {
       daily_series: [...series.values()].sort((left, right) => left.date.localeCompare(right.date)),
       meals,
     };
+  },
+
+  async deleteMeal(logId: string): Promise<void> {
+    await this.me();
+    await deleteDoc(doc(db, "food_analysis_logs", logId));
   },
 
   async whitelist(): Promise<WhitelistEntry[]> {

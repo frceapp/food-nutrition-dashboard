@@ -33,8 +33,13 @@ service cloud.firestore {
 
     match /food_analysis_logs/{logId} {
       allow read: if isActiveAdmin()
-        || (isActiveUser() && resource.data.user_id == viewerPhone());
-      allow write: if false;
+        || (
+          isActiveUser()
+          && resource.data.user_id == viewerPhone()
+          && resource.data.status == "success"
+        );
+      allow create, update: if false;
+      allow delete: if isActiveAdmin();
     }
 
     match /usage_events/{eventId} {

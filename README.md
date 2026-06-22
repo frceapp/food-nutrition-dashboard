@@ -17,6 +17,10 @@ firebase deploy --only firestore
 
 Rules memberikan admin aktif akses pengelolaan penuh dashboard. Pengguna whitelist biasa hanya dapat membaca profil dan log makanan miliknya sendiri.
 
+Log berstatus `rejected` hanya dapat dibaca admin. Item tersebut diberi penanda **Ditolak pengguna** pada daftar makanan admin dan tidak dimasukkan ke total maupun grafik nutrisi.
+
+Admin dapat menghapus permanen catatan makanan dari daftar. Tombol hapus tidak dirender untuk pengguna biasa dan Firestore Rules hanya mengizinkan operasi tersebut untuk admin aktif.
+
 ### Error `auth/configuration-not-found`
 
 Buka Firebase Console untuk project yang sama, pilih **Authentication**, lalu klik **Get started**. Custom-token login tidak memerlukan provider email atau Google, tetapi layanan Authentication tetap harus diinisialisasi. Tambahkan domain deployment dashboard di **Authentication > Settings > Authorized domains**.

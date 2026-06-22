@@ -137,7 +137,7 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-function Overview({ data, loading }: { data: DashboardData | null; loading: boolean }) {
+function Overview({ data, loading, canDelete = false, onDeleteMeal }: { data: DashboardData | null; loading: boolean; canDelete?: boolean; onDeleteMeal?: (id: string) => void }) {
   if (loading) return <div className="page-loader"><LoaderCircle className="spin" /> Memuat data nutrisi…</div>;
   if (!data) return <EmptyState title="Pilih pengguna" body="Pilih nomor WhatsApp untuk melihat data nutrisi." />;
 
@@ -279,13 +279,13 @@ function Overview({ data, loading }: { data: DashboardData | null; loading: bool
           <div className="meal-list">
             {data.meals.map((meal) => (
               <article className="meal-row" key={meal.id}>
-                <div className="meal-time"><strong>{formatTime(meal.created_at)}</strong><span>{formatDate(meal.date)}</span></div>
+                <div className="meal-time"><strong>{formatTime(meal.created_at)}</strong><span>{formatDate(meal.date)}</span>{meal.status === "rejected" && <em>Ditolak pengguna</em>}</div>
                 <div className="meal-foods">
                   {meal.foods.map((food, index) => (
                     <span className="food-chip" key={`${food.name}-${index}`}>{food.emoji || "🍽️"} {food.name} <small>{food.estimated_portion}</small></span>
                   ))}
                 </div>
-                <div className="meal-calories"><Flame size={16} /> <strong>{fmt(meal.nutrition.energy_kcal)}</strong><span>kkal</span></div>
+                <div className="meal-actions"><div className="meal-calories"><Flame size={16} /> <strong>{fmt(meal.nutrition.energy_kcal)}</strong><span>kkal</span></div>{canDelete && <button className="icon-button danger" onClick={() => onDeleteMeal?.(meal.id)} title="Hapus catatan makanan" aria-label="Hapus catatan makanan"><Trash2 size={16} /></button>}</div>
               </article>
             ))}
           </div>
@@ -512,10 +512,17 @@ function DashboardApp({ viewer }: { viewer: Viewer }) {
   useEffect(() => {
     if (!selectedPhone || view !== "overview") return;
     setLoading(true);
-    dataService.dashboard(selectedPhone, period).then(setData).finally(() => setLoading(false));
-  }, [selectedPhone, period, view]);
+    dataService.dashboard(selectedPhone, period, viewer.is_admin).then(setData).finally(() => setLoading(false));
+  }, [selectedPhone, period, view, viewer.is_admin]);
 
   const logout = () => { logoutAdmin().finally(() => window.location.assign("/login")); };
+  const deleteMeal = async (logId: string) => {
+    if (!viewer.is_admin || !window.confirm("Hapus catatan makanan ini secara permanen?")) return;
+    await dataService.deleteMeal(logId);
+    if (selectedPhone) {
+      setData(await dataService.dashboard(selectedPhone, period, true));
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -541,12 +548,12 @@ function DashboardApp({ viewer }: { viewer: Viewer }) {
             <div className="topbar-controls">
               {viewer.is_admin ? <label className="user-select"><Users size={17} /><select aria-label="Pilih pengguna" value={selectedPhone} onChange={(e) => setSelectedPhone(e.target.value)}><option value="">Pilih pengguna</option>{users.map((user) => <option key={user.phone_number} value={user.phone_number}>{user.label || user.phone_number}</option>)}</select><ChevronDown size={15} /></label> : <div className="profile-pill"><CircleUserRound size={17} /><strong>{viewerLabel}</strong></div>}
               <div className="period-toggle"><button className={period === "daily" ? "active" : ""} onClick={() => setPeriod("daily")}>Hari ini</button><button className={period === "weekly" ? "active" : ""} onClick={() => setPeriod("weekly")}>7 hari</button></div>
-              <button className="icon-button refresh-button" onClick={() => selectedPhone && dataService.dashboard(selectedPhone, period).then(setData)} title="Muat ulang" aria-label="Muat ulang data"><RefreshCw size={18} /></button>
+              <button className="icon-button refresh-button" onClick={() => selectedPhone && dataService.dashboard(selectedPhone, period, viewer.is_admin).then(setData)} title="Muat ulang" aria-label="Muat ulang data"><RefreshCw size={18} /></button>
             </div>
           ) : <div className="topbar-title"><ShieldCheck size={18} /> Admin dashboard</div>}
         </header>
         <div className="content-area">
-          {view === "overview" && <Overview data={data} loading={loading} />}
+          {view === "overview" && <Overview data={data} loading={loading} canDelete={viewer.is_admin} onDeleteMeal={deleteMeal} />}
           {view === "usage" && <UsagePanel />}
           {view === "whitelist" && <WhitelistPanel />}
           {view === "settings" && <SettingsPanel />}

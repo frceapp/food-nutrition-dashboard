@@ -34,6 +34,7 @@ export interface NutritionValues {
 
 export interface Meal {
   id: string;
+  status: "success" | "rejected";
   created_at: string;
   date: string;
   foods: FoodItem[];
